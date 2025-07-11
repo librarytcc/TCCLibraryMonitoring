@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Library Monitoring System</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+    .main-container, .admin-panel {
+      background-color: #ffffff;
+      padding: 30px 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 1000px;
+      margin: 20px auto;
+      overflow-x: auto;
+    }
+    .logo {
+      display: block;
+      margin: 0 auto 10px auto;
+      max-width: 100px;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .button-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .button-group button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .button-group button:hover {
+      background-color: #0056b3;
+    }
+    .admin-link {
+      text-align: center;
+      margin-top: 15px;
+    }
+    .admin-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th {
+      background-color: #eaeaea;
+    }
+    .remove-btn {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container" id="main">
+    <img src="https://i.imgur.com/kaVX8OQ.png" alt="TCC Logo" class="logo">
+    <h1>LIBRARY MONITORING SYSTEM</h1>
+
+    <label for="idInput">TCC ID NUMBER</label>
+    <input type="text" id="idInput" placeholder="0034-2024" maxlength="9" oninput="formatIDNumber()">
+
+    <label for="name">FULL NAME</label>
+    <input type="text" id="name" placeholder="Juan Dela Cruz">
+
+    <label for="program">PROGRAM, YEAR & SECTION</label>
+    <input type="text" id="program" placeholder="e.g. BSCPE-1A" oninput="formatProgram()">
+
+    <label for="purpose">PURPOSE</label>
+    <input type="text" id="purpose" placeholder="Study, Research, etc.">
+
+    <div class="button-group">
+      <button onclick="submitData('Time In')">TIME IN</button>
+      <button onclick="submitData('Time Out')">TIME OUT</button>
+    </div>
+
+    <p id="front-log-count" style="text-align:center; font-weight:bold; margin-top: 15px;"></p>
+    <div class="admin-link">
+      <a href="#" onclick="showAdminPanel()">ADMIN LOGIN</a>
+    </div>
+  </div>
+
+  <div class="admin-panel" id="admin-panel" style="display: none;">
+    <h2>Log Records</h2>
+    <p id="log-count" style="font-weight: bold;"></p>
+    <button onclick="exportCSV()">Export CSV</button>
+    <button onclick="clearLogs()">Clear All Logs</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>ID Number</th>
+          <th>Name</th>
+          <th>Program</th>
+          <th>Purpose</th>
+          <th>Time In</th>
+          <th>Time Out</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    function updateFrontLogCount() {
+      const logs = JSON.parse(localStorage.getItem("logs") || "[]");
+      document.getElementById("front-log-count").innerText = `📊 Total Logs: ${logs.length}`;
+    }
+
+    window.onload = updateFrontLogCount;
+
+    const password = "TCClibrary 24";
+
+    function capitalizeWords(str) {
+      return str.replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function formatIDNumber() {
+      const input = document.getElementById("idInput");
+      input.value = input.value.replace(/[^0-9-]/g, "").toUpperCase();
+    }
+
+    function formatProgram() {
+      const input = document.getElementById("program");
+      input.value = input.value.toUpperCase();
+    }
+
+    function submitData(status) {
+      updateFrontLogCount();
+      const idInput = document.getElementById("idInput").value.trim();
+      const idPattern = /^\d{4}-20\d{2}$/;
+      const name = document.getElementById("name").value.trim();
+      const program = document.getElementById("program").value.trim();
+      const purpose = document.getElementById("purpose").value.trim();
+      const now = new Date();
+      const date = now.toLocaleDateString();
+      const time = now.toLocaleTimeString();
+
+      let logs = JSON.parse(localStorage.getItem("logs") || "[]");
+
+      if (logs.length >= 30) {
+        alert("⚠️ Log limit reached (30 entries). Please ask the admin to export and clear the logs before continuing.");
+        return;
+      }
+
+      if (!idPattern.test(idInput) || !name || !program || !purpose) {
+        alert("Please fill in all fields correctly.\nID must follow: 00XX-202X");
+        return;
+      }
+
+      const existing = logs.find(log => log.date === date && log.idNumber === idInput);
+
+      if (status === "Time In") {
+        if (existing && existing.timeIn) {
+          alert("You already timed in today.");
+          return;
+        } else if (existing) {
+          existing.timeIn = time;
+        } else {
+          logs.push({ date, idNumber: idInput, name, program, purpose, timeIn: time, timeOut: "" });
+        }
+      }
+
+      if (status === "Time Out") {
+        if (!existing) {
+          alert("No Time In found for today. Please Time In first.");
+          return;
+        } else if (existing.timeOut) {
+          alert("You already timed out today.");
+          return;
+        } else {
+          existing.timeOut = time;
+        }
+      }
+
+      localStorage.setItem("logs", JSON.stringify(logs));
+      alert(`${status} recorded for ${name}`);
+
+      document.getElementById("idInput").value = "";
+      document.getElementById("name").value = "";
+      document.getElementById("program").value = "";
+      document.getElementById("purpose").value = "";
+    }
+
+    function showAdminPanel() {
+      const input = prompt("Enter admin password:");
+      if (input === password) {
+        document.getElementById("main").style.display = "none";
+        document.getElementById("admin-panel").style.display = "block";
+        loadLogs();
+      } else {
+        alert("Incorrect password.");
+      }
+    }
+
+    function loadLogs() {
+      updateFrontLogCount();
+      const logs = JSON.parse(localStorage.getItem("logs") || "[]");
+      const tbody = document.getElementById("log-body");
+      tbody.innerHTML = "";
+      document.getElementById("log-count").innerText = `Total Logs: ${logs.length}`;
+
+      logs.forEach((log, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${log.date}</td>
+          <td>${log.idNumber}</td>
+          <td>${capitalizeWords(log.name)}</td>
+          <td>${log.program}</td>
+          <td>${log.purpose}</td>
+          <td>${log.timeIn || "-"}</td>
+          <td>${log.timeOut || "-"}</td>
+          <td><button class="remove-btn" onclick="removeLog(${index})">Remove</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function removeLog(index) {
+      let logs = JSON.parse(localStorage.getItem("logs") || "[]");
+      logs.splice(index, 1);
+      localStorage.setItem("logs", JSON.stringify(logs));
+      loadLogs();
+    }
+
+    function clearLogs() {
+      updateFrontLogCount();
+      if (confirm("Are you sure you want to delete all logs?")) {
+        localStorage.removeItem("logs");
+        loadLogs();
+        alert("Logs cleared.");
+      }
+    }
+
+    function exportCSV() {
+      const logs = JSON.parse(localStorage.getItem("logs") || "[]");
+      let csv = "Date,ID Number,Name,Program,Purpose,Time In,Time Out\n";
+      logs.forEach(log => {
+        csv += `${log.date},"${log.idNumber}","${capitalizeWords(log.name)}","${log.program}","${log.purpose}",${log.timeIn || ""},${log.timeOut || ""}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "library_logs.csv";
+      a.click();
+    }
+  </script>
+</body>
+</html>
